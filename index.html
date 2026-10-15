@@ -3,432 +3,479 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GymMemory 2.2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GymMemory 3.0</title>
 <style>
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  color: #17233e;
+  background: #f3f6fc;
+}
 * { box-sizing: border-box; }
-body {
-  margin: 0;
-  padding: 16px;
-  background: #f4f5fa;
-  color: #172033;
-  font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+body { margin: 0; padding: 15px; }
+header {
+  max-width: 1300px;
+  margin: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
-h1 { text-align: center; margin: 14px 0 20px; }
-.panel {
-  background: white;
-  padding: 16px;
-  border-radius: 16px;
-  margin: 12px auto;
-  max-width: 1000px;
-}
-button, select, input {
-  font: inherit;
-  margin: 4px;
-}
+h1 { font-size: 28px; margin: 12px 0; }
+button, select, input { font: inherit; }
 button {
-  padding: 12px 16px;
-  border: none;
-  border-radius: 10px;
-  background: #2763e7;
+  border: 0;
+  background: #2868ee;
   color: white;
+  padding: 11px 15px;
+  border-radius: 12px;
   cursor: pointer;
 }
-button.secondary { background: #e5ebf8; color: #24416e; }
-button:disabled { opacity: .45; }
-select, input[type="text"] {
-  padding: 10px;
-  border: 1px solid #cbd2df;
-  border-radius: 8px;
-  max-width: 100%;
+button.secondary { background: #e7edfa; color: #2452a5; }
+button.selected { outline: 3px solid #6ba0ff; }
+button:disabled { opacity: .5; }
+.panel {
+  background: white;
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 3px 15px #253b6510;
 }
-.stage {
-  position: relative;
-  width: 100%;
+.layout {
+  max-width: 1300px;
+  margin: 12px auto;
+  display: grid;
+  grid-template-columns: 1.65fr 1fr;
+  gap: 14px;
+}
+.cameraBox {
+  background: #101725;
+  border-radius: 16px;
   overflow: hidden;
-  border-radius: 12px;
-  background: #101827;
-  min-height: 240px;
+  position: relative;
+  min-height: 260px;
 }
 video {
-  display: block;
   width: 100%;
-  height: auto;
-  /* No mirroring */
+  display: block;
   transform: scaleX(-1);
 }
-canvas {
+#overlay {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none;
   transform: scaleX(-1);
+  pointer-events: none;
 }
-.status {
-  padding: 10px 0;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
+#target {
+  position: absolute;
+  z-index: 3;
+  display: none;
+  font-size: 44px;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 9px white);
+  pointer-events: none;
 }
-.small { color: #657087; font-size: 14px; }
-.good { color: #13834c; }
-.bad { color: #bd3030; }
-#memoryDisplay {
+#target.hit { animation: pop .35s ease-out; }
+@keyframes pop {
+  50% { transform: translate(-50%, -50%) scale(1.7); opacity: .4; }
+  100% { transform: translate(-50%, -50%) scale(.2); opacity: 0; }
+}
+.trainerBox {
+  background: linear-gradient(150deg, #e9f0fc, #d8e4f6);
+  border-radius: 16px;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   padding: 12px;
+}
+#trainer {
+  width: 100%;
+  max-width: 340px;
+  height: 360px;
+}
+#leftArm, #rightArm, #leftLeg, #rightLeg {
+  transition: transform 1s ease-in-out;
+  transform-box: fill-box;
+  transform-origin: center top;
+}
+.controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.status { font-size: 14px; margin: 8px 0; overflow-wrap: anywhere; }
+.ok { color: #14834b; }
+.error { color: #b52d38; }
+.small { color: #687690; font-size: 13px; }
+.choices {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.choice {
+  background: #eef3fc;
+  color: #213b68;
+  min-width: 65px;
+}
+.choice.active { background: #2868ee; color: white; }
+select {
+  padding: 10px;
+  border: 1px solid #ccd5e5;
   border-radius: 10px;
-  background: #f0f4fc;
-  min-height: 48px;
-  line-height: 1.5;
+}
+.progress {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #d4dceb;
+}
+.dot.done { background: #2868ee; }
+.bottom {
+  max-width: 1300px;
+  margin: 12px auto;
+}
+@media(max-width: 800px) {
+  .layout { grid-template-columns: 1fr; }
+  .trainerBox { min-height: 340px; }
+  #trainer { height: 300px; }
 }
 </style>
 </head>
-
 <body>
-<h1>🤸 GymMemory 2.2</h1>
 
-<div class="panel">
-  <button id="startBtn">📷 Включить камеру</button>
-  <button id="stopBtn" class="secondary">Выключить</button>
-
-  <div id="cameraStatus" class="status">
-    Камера выключена.
+<header>
+  <h1>🤸 GymMemory 3.0</h1>
+  <div class="controls">
+    <button id="soundBtn" class="secondary">🔊 Голос включён</button>
+    <button id="cameraBtn">📷 Включить камеру</button>
+    <button id="stopCameraBtn" class="secondary">Выключить</button>
   </div>
+</header>
 
-  <div id="modelStatus" class="status small">
-    Распознавание ещё не запущено.
-  </div>
+<main class="layout">
+  <section class="panel">
+    <div id="cameraStatus" class="status">Камера выключена.</div>
+    <div id="modelStatus" class="status small">Распознавание не загружено.</div>
+    <div class="cameraBox" id="cameraBox">
+      <video id="video" autoplay muted playsinline></video>
+      <canvas id="overlay"></canvas>
+      <div id="target">⭐</div>
+    </div>
+    <p class="small">
+      🟢 Правильно · 🔴 Исправь положение · ⚪ Камера не видит сустав
+    </p>
+  </section>
 
-  <div class="stage">
-    <video id="video" autoplay muted playsinline></video>
-    <canvas id="canvas"></canvas>
+  <section class="panel">
+    <div class="trainerBox">
+      <div class="controls">
+        <button id="girlBtn" class="secondary selected">👧 Девочка</button>
+        <button id="boyBtn" class="secondary">👦 Мальчик</button>
+      </div>
+
+      <svg id="trainer" viewBox="0 0 300 390"
+           xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="150" cy="374" rx="63" ry="9" fill="#bdcce1"/>
+        <g id="leftLeg">
+          <path d="M136 220 L133 320 L126 360"
+                stroke="#334155" stroke-width="27"
+                stroke-linecap="round" fill="none"/>
+          <ellipse cx="124" cy="363" rx="19" ry="9" fill="white"/>
+        </g>
+        <g id="rightLeg">
+          <path d="M164 220 L167 320 L174 360"
+                stroke="#334155" stroke-width="27"
+                stroke-linecap="round" fill="none"/>
+          <ellipse cx="176" cy="363" rx="19" ry="9" fill="white"/>
+        </g>
+        <path d="M121 129 Q150 120 179 129 L175 233
+                 Q150 244 125 233 Z"
+              fill="#43536d"/>
+        <path d="M139 110 L139 132 M161 110 L161 132"
+              stroke="#e7b395" stroke-width="13"/>
+        <g id="leftArm">
+          <path d="M125 142 L88 196 L73 243"
+                stroke="#43536d" stroke-width="22"
+                stroke-linecap="round" fill="none"/>
+          <circle cx="73" cy="244" r="10" fill="#e7b395"/>
+        </g>
+        <g id="rightArm">
+          <path d="M175 142 L212 196 L227 243"
+                stroke="#43536d" stroke-width="22"
+                stroke-linecap="round" fill="none"/>
+          <circle cx="227" cy="244" r="10" fill="#e7b395"/>
+        </g>
+        <g id="hairBack">
+          <path d="M117 77 Q113 23 150 23 Q187 23 183 77
+                   L182 105 L118 105 Z"
+                fill="#5a3c31"/>
+        </g>
+        <ellipse cx="150" cy="76" rx="33" ry="42" fill="#e7b395"/>
+        <path id="hairFront"
+              d="M118 69 Q112 33 146 29 Q183 27 182 66
+                 Q167 53 153 48 Q137 64 118 69"
+              fill="#5a3c31"/>
+        <circle cx="138" cy="78" r="2.5" fill="#293344"/>
+        <circle cx="162" cy="78" r="2.5" fill="#293344"/>
+        <path d="M142 94 Q150 100 158 94"
+              fill="none" stroke="#b56d68"
+              stroke-width="2" stroke-linecap="round"/>
+      </svg>
+
+      <div id="trainerHint" class="small">
+        Тренер готов показать движение
+      </div>
+    </div>
+  </section>
+</main>
+
+<section class="panel bottom">
+  <h3>🎮 Игровая тренировка</h3>
+  <div class="controls">
+    <button id="startTraining">▶ Начать программу</button>
+    <button id="nextExercise" class="secondary">Следующее движение</button>
+    <button id="stopTraining" class="secondary">Завершить</button>
   </div>
 
   <p class="small">
-    Зелёные линии — положение близко к образцу.
-    Красные — положение отличается.
-    Серые — точка тела плохо видна.
+    Выбери предмет, которого ребёнок будет касаться рукой.
   </p>
-</div>
-
-<div class="panel">
-  <h3>Проверка упражнения</h3>
-
-  <select id="poseSelect"></select>
-
-  <p>
-    Допустимое отклонение:
-    <strong id="toleranceValue">25°</strong>
-  </p>
-
-  <input
-    id="tolerance"
-    type="range"
-    min="10"
-    max="60"
-    value="25"
-  >
-
-  <p id="accuracy">Точность: —</p>
-
-  <input
-    id="poseName"
-    type="text"
-    placeholder="Название новой позы"
-  >
-
-  <button id="savePose">Сохранить мою позу</button>
-  <button id="deletePose" class="secondary">
-    Удалить выбранную позу
-  </button>
-</div>
-
-<div class="panel">
-  <h3>🧠 Тренировка памяти</h3>
-
-  <p>
-    Запомни последовательность упражнений,
-    затем повтори её по памяти перед камерой.
-  </p>
-
-  <button id="memoryStart">Начать тренировку</button>
-  <button id="memoryCheck">Проверить текущую позу</button>
-  <button id="memoryStop" class="secondary">Завершить</button>
-
-  <div id="memoryDisplay">
-    Нажми «Начать тренировку».
+  <div class="choices" id="objectChoices">
+    <button class="choice active" data-object="⭐">⭐ Звезда</button>
+    <button class="choice" data-object="🎈">🎈 Шар</button>
+    <button class="choice" data-object="⚽">⚽ Мяч</button>
+    <button class="choice" data-object="🧸">🧸 Мишка</button>
   </div>
-</div>
+
+  <div class="progress" id="progress"></div>
+  <p id="gameStatus" class="status">
+    Нажми «Начать программу».
+  </p>
+</section>
 
 <script type="module">
 const $ = id => document.getElementById(id);
 
 const video = $("video");
-const canvas = $("canvas");
+const canvas = $("overlay");
 const ctx = canvas.getContext("2d");
 
 let stream = null;
-let landmarker = null;
-let latestLandmarks = null;
-let cameraActive = false;
-let processing = false;
-let lastVideoTime = -1;
-let animationId = null;
-let sessionId = 0;
+let model = null;
+let cameraRunning = false;
+let lastTime = -1;
+let landmarks = null;
+let session = 0;
+let soundOn = true;
+let trainerGender = "girl";
+let objectEmoji = "⭐";
+let training = false;
+let exerciseIndex = 0;
+let trainingTimer = null;
+let targetPosition = null;
+let targetHit = false;
 
-const BUILTIN = {
-  up: {
-    name: "Руки вверх",
-    left: 170,
-    right: 170
-  },
-  side: {
-    name: "Руки в стороны",
-    left: 90,
-    right: 90
-  },
-  down: {
-    name: "Руки вниз",
-    left: 15,
-    right: 15
+const exercises = [
+  { name: "Руки в стороны", voice: "Разведи руки в стороны", pose: "side" },
+  { name: "Руки вверх", voice: "Подними руки вверх", pose: "up" },
+  { name: "Руки вниз", voice: "Опусти руки", pose: "down" },
+  { name: "Руки в стороны", voice: "Снова разведи руки в стороны", pose: "side" },
+  { name: "Руки вверх", voice: "Ещё раз подними руки вверх", pose: "up" }
+];
+
+function speak(text) {
+  if (!soundOn || !("speechSynthesis" in window)) return;
+
+  speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "ru-RU";
+  utterance.rate = 0.85;
+  utterance.pitch = 1.05;
+
+  const voices = speechSynthesis.getVoices();
+  const russianVoice = voices.find(v => v.lang.startsWith("ru"));
+  if (russianVoice) utterance.voice = russianVoice;
+
+  speechSynthesis.speak(utterance);
+}
+
+$("soundBtn").onclick = () => {
+  soundOn = !soundOn;
+  $("soundBtn").textContent = soundOn
+    ? "🔊 Голос включён"
+    : "🔇 Голос выключен";
+
+  if (!soundOn && "speechSynthesis" in window) {
+    speechSynthesis.cancel();
   }
 };
 
-let customPoses = {};
+function setGender(gender) {
+  trainerGender = gender;
+  $("girlBtn").classList.toggle("selected", gender === "girl");
+  $("boyBtn").classList.toggle("selected", gender === "boy");
 
-try {
-  customPoses = JSON.parse(
-    localStorage.getItem("gymmemory_poses") || "{}"
+  $("hairBack").style.display = gender === "girl" ? "" : "none";
+
+  $("hairFront").setAttribute(
+    "d",
+    gender === "girl"
+      ? "M118 69 Q112 33 146 29 Q183 27 182 66 Q167 53 153 48 Q137 64 118 69"
+      : "M118 60 Q120 34 148 35 Q176 34 182 59 Q166 48 150 48 Q135 54 118 60"
   );
-} catch (e) {
-  customPoses = {};
 }
 
-function allPoses() {
-  return { ...BUILTIN, ...customPoses };
+$("girlBtn").onclick = () => setGender("girl");
+$("boyBtn").onclick = () => setGender("boy");
+
+function animateTrainer(pose) {
+  const left = $("leftArm");
+  const right = $("rightArm");
+
+  if (pose === "up") {
+    left.style.transform = "rotate(155deg)";
+    right.style.transform = "rotate(-155deg)";
+  } else if (pose === "side") {
+    left.style.transform = "rotate(65deg)";
+    right.style.transform = "rotate(-65deg)";
+  } else {
+    left.style.transform = "rotate(0deg)";
+    right.style.transform = "rotate(0deg)";
+  }
 }
 
-function refreshPoses() {
-  const previous = $("poseSelect").value;
-  const select = $("poseSelect");
-  select.innerHTML = "";
+function updateProgress() {
+  $("progress").innerHTML = "";
 
-  for (const [id, pose] of Object.entries(allPoses())) {
-    const option = document.createElement("option");
-    option.value = id;
-    option.textContent = pose.name;
-    select.appendChild(option);
+  exercises.forEach((_, i) => {
+    const dot = document.createElement("div");
+    dot.className = "dot" + (i <= exerciseIndex && training ? " done" : "");
+    $("progress").appendChild(dot);
+  });
+}
+
+function setTargetVisible(visible) {
+  $("target").style.display = visible ? "block" : "none";
+}
+
+function positionTarget() {
+  targetHit = false;
+
+  const pose = exercises[exerciseIndex]?.pose || "side";
+
+  if (pose === "up") {
+    targetPosition = { x: 0.73, y: 0.18 };
+  } else if (pose === "down") {
+    targetPosition = { x: 0.72, y: 0.78 };
+  } else {
+    targetPosition = { x: 0.82, y: 0.48 };
   }
 
-  if (allPoses()[previous]) select.value = previous;
+  $("target").textContent = objectEmoji;
+  $("target").style.left = (targetPosition.x * 100) + "%";
+  $("target").style.top = (targetPosition.y * 100) + "%";
+  $("target").classList.remove("hit");
+  setTargetVisible(true);
 }
 
-refreshPoses();
+function showExercise() {
+  if (!training || exerciseIndex >= exercises.length) return;
 
-function setCameraStatus(message) {
-  $("cameraStatus").textContent = message;
+  const exercise = exercises[exerciseIndex];
+
+  animateTrainer(exercise.pose);
+  $("trainerHint").textContent =
+    "Движение " + (exerciseIndex + 1) + " из " + exercises.length;
+
+  $("gameStatus").textContent =
+    "Выполняется упражнение " +
+    (exerciseIndex + 1) + " из " + exercises.length;
+
+  updateProgress();
+  positionTarget();
+  speak(exercise.voice);
+
+  clearTimeout(trainingTimer);
+  trainingTimer = setTimeout(() => {
+    if (training) nextExercise();
+  }, 9000);
 }
 
-function setModelStatus(message) {
-  $("modelStatus").textContent = message;
+function nextExercise() {
+  if (!training) return;
+
+  exerciseIndex++;
+
+  if (exerciseIndex >= exercises.length) {
+    finishTraining(true);
+    return;
+  }
+
+  showExercise();
 }
 
-function angle(a, b, c) {
-  const ab = {
-    x: a.x - b.x,
-    y: a.y - b.y
+function finishTraining(completed) {
+  training = false;
+  clearTimeout(trainingTimer);
+  setTargetVisible(false);
+
+  $("gameStatus").textContent = completed
+    ? "🎉 Программа завершена!"
+    : "Тренировка остановлена.";
+
+  $("trainerHint").textContent = "Тренер отдыхает";
+
+  if (completed) speak("Молодец! Тренировка завершена!");
+  updateProgress();
+}
+
+$("startTraining").onclick = () => {
+  if (!cameraRunning) {
+    $("gameStatus").textContent = "Сначала включи камеру.";
+    speak("Сначала включи камеру");
+    return;
+  }
+
+  training = true;
+  exerciseIndex = 0;
+  showExercise();
+};
+
+$("nextExercise").onclick = nextExercise;
+$("stopTraining").onclick = () => finishTraining(false);
+
+document.querySelectorAll("[data-object]").forEach(button => {
+  button.onclick = () => {
+    objectEmoji = button.dataset.object;
+
+    document.querySelectorAll("[data-object]").forEach(b => {
+      b.classList.toggle("active", b === button);
+    });
+
+    if (training) positionTarget();
   };
-  const cb = {
-    x: c.x - b.x,
-    y: c.y - b.y
-  };
-
-  const dot = ab.x * cb.x + ab.y * cb.y;
-  const len1 = Math.hypot(ab.x, ab.y);
-  const len2 = Math.hypot(cb.x, cb.y);
-
-  if (!len1 || !len2) return null;
-
-  const cosine = Math.max(
-    -1,
-    Math.min(1, dot / (len1 * len2))
-  );
-
-  return Math.acos(cosine) * 180 / Math.PI;
-}
-
-function visible(p) {
-  return p && (p.visibility ?? 1) >= 0.45;
-}
-
-function armAngles(lm) {
-  if (!lm) return null;
-
-  const leftOK =
-    visible(lm[11]) &&
-    visible(lm[13]) &&
-    visible(lm[23]);
-
-  const rightOK =
-    visible(lm[12]) &&
-    visible(lm[14]) &&
-    visible(lm[24]);
-
-  return {
-    left: leftOK
-      ? angle(lm[13], lm[11], lm[23])
-      : null,
-    right: rightOK
-      ? angle(lm[14], lm[12], lm[24])
-      : null
-  };
-}
-
-function comparePose(targetId) {
-  const pose = allPoses()[targetId];
-  const measured = armAngles(latestLandmarks);
-
-  if (!pose || !measured) return null;
-
-  const tolerance = Number($("tolerance").value);
-  const results = [];
-
-  for (const side of ["left", "right"]) {
-    if (measured[side] !== null) {
-      results.push({
-        side,
-        error: Math.abs(measured[side] - pose[side])
-      });
-    }
-  }
-
-  if (!results.length) return null;
-
-  const averageError =
-    results.reduce((sum, r) => sum + r.error, 0) /
-    results.length;
-
-  return {
-    passed:
-      results.length === 2 &&
-      results.every(r => r.error <= tolerance),
-    accuracy: Math.max(
-      0,
-      Math.round(100 * (1 - averageError / 180))
-    ),
-    errors: results
-  };
-}
-
-const CONNECTIONS = [
-  [11,12],
-  [11,13],
-  [13,15],
-  [12,14],
-  [14,16],
-  [11,23],
-  [12,24],
-  [23,24],
-  [23,25],
-  [25,27],
-  [24,26],
-  [26,28]
-];
-
-function drawSkeleton(lm) {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  if (!lm) return;
-
-  const comparison = comparePose($("poseSelect").value);
-  const tolerance = Number($("tolerance").value);
-  const errors = {};
-
-  if (comparison) {
-    for (const result of comparison.errors) {
-      errors[result.side] = result.error;
-    }
-  }
-
-  for (const [a, b] of CONNECTIONS) {
-    const p1 = lm[a];
-    const p2 = lm[b];
-
-    if (!p1 || !p2) continue;
-
-    let color = "#42d88c";
-
-    if (!visible(p1) || !visible(p2)) {
-      color = "#9ca3af";
-    } else {
-      let side = null;
-
-      if (
-        [11,13,15].includes(a) &&
-        [11,13,15].includes(b)
-      ) side = "left";
-
-      if (
-        [12,14,16].includes(a) &&
-        [12,14,16].includes(b)
-      ) side = "right";
-
-      if (side && errors[side] !== undefined) {
-        color = errors[side] <= tolerance
-          ? "#42d88c"
-          : "#ff5050";
-      }
-    }
-
-    ctx.beginPath();
-    ctx.moveTo(
-      p1.x * canvas.width,
-      p1.y * canvas.height
-    );
-    ctx.lineTo(
-      p2.x * canvas.width,
-      p2.y * canvas.height
-    );
-    ctx.strokeStyle = color;
-    ctx.lineWidth = Math.max(3, canvas.width / 150);
-    ctx.lineCap = "round";
-    ctx.stroke();
-  }
-
-  for (const index of [
-    11,12,13,14,15,16,
-    23,24,25,26,27,28
-  ]) {
-    const p = lm[index];
-    if (!visible(p)) continue;
-
-    ctx.beginPath();
-    ctx.arc(
-      p.x * canvas.width,
-      p.y * canvas.height,
-      Math.max(3, canvas.width / 180),
-      0,
-      Math.PI * 2
-    );
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-  }
-}
+});
 
 async function startCamera() {
-  if (cameraActive) return;
+  if (cameraRunning) return;
 
-  const currentSession = ++sessionId;
+  const currentSession = ++session;
 
-  setCameraStatus("Запрашиваю доступ к камере...");
-  setModelStatus("Камера запускается независимо от модели.");
+  $("cameraStatus").textContent = "Запрашиваю камеру...";
 
   try {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error(
-        "Этот браузер не поддерживает доступ к камере."
-      );
-    }
-
     stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: {
@@ -438,7 +485,7 @@ async function startCamera() {
       }
     });
 
-    if (currentSession !== sessionId) {
+    if (currentSession !== session) {
       stream.getTracks().forEach(t => t.stop());
       return;
     }
@@ -446,52 +493,49 @@ async function startCamera() {
     video.srcObject = stream;
     await video.play();
 
-    cameraActive = true;
-
+    cameraRunning = true;
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
 
-    setCameraStatus("✅ Камера работает!");
-    setModelStatus("Загружаю распознавание тела...");
+    $("cameraStatus").textContent = "✅ Камера работает!";
+    $("cameraStatus").className = "status ok";
 
-    animationId = requestAnimationFrame(renderLoop);
-
-    // Camera is already running at this point.
-    loadModel(currentSession);
+    requestAnimationFrame(loop);
+    loadPoseModel(currentSession);
 
   } catch (error) {
-    setCameraStatus(
-      "❌ Ошибка камеры: " + error.message
-    );
+    $("cameraStatus").textContent =
+      "❌ Ошибка камеры: " + error.message;
+    $("cameraStatus").className = "status error";
   }
 }
 
-async function loadModel(currentSession) {
-  try {
-    if (landmarker) {
-      setModelStatus("✅ Модель готова.");
-      return;
-    }
+async function loadPoseModel(currentSession) {
+  if (model) {
+    $("modelStatus").textContent = "✅ Модель готова.";
+    return;
+  }
 
-    setModelStatus("Шаг 1/2: загружаю MediaPipe...");
+  try {
+    $("modelStatus").textContent = "Загружаю MediaPipe...";
 
     const vision = await import(
       "https://unpkg.com/@mediapipe/tasks-vision@0.10.35/vision_bundle.mjs"
     );
 
-    if (currentSession !== sessionId) return;
+    if (currentSession !== session) return;
 
     const { FilesetResolver, PoseLandmarker } = vision;
 
-    setModelStatus("Шаг 2/2: загружаю модель тела...");
+    $("modelStatus").textContent = "Загружаю модель тела...";
 
     const fileset = await FilesetResolver.forVisionTasks(
       "https://unpkg.com/@mediapipe/tasks-vision@0.10.35/wasm"
     );
 
-    if (currentSession !== sessionId) return;
+    if (currentSession !== session) return;
 
-    const instance = await PoseLandmarker.createFromOptions(
+    const createdModel = await PoseLandmarker.createFromOptions(
       fileset,
       {
         baseOptions: {
@@ -500,314 +544,205 @@ async function loadModel(currentSession) {
           delegate: "CPU"
         },
         runningMode: "VIDEO",
-        numPoses: 1,
-        minPoseDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
+        numPoses: 1
       }
     );
 
-    if (currentSession !== sessionId) {
-      instance.close();
+    if (currentSession !== session) {
+      createdModel.close();
       return;
     }
 
-    landmarker = instance;
-    setModelStatus("✅ Модель готова. Ищу человека...");
+    model = createdModel;
+    $("modelStatus").textContent = "✅ Распознавание готово.";
 
   } catch (error) {
-    console.error(error);
-    setModelStatus(
-      "⚠️ Распознавание не загрузилось: " +
-      error.message +
-      ". Камера продолжает работать."
-    );
+    $("modelStatus").textContent =
+      "⚠️ Распознавание недоступно: " + error.message;
   }
 }
 
-function renderLoop() {
-  if (!cameraActive) return;
+function angle(a, b, c) {
+  const ax = a.x - b.x, ay = a.y - b.y;
+  const cx = c.x - b.x, cy = c.y - b.y;
+  const dot = ax * cx + ay * cy;
+  const length = Math.hypot(ax, ay) * Math.hypot(cx, cy);
+
+  if (!length) return null;
+
+  return Math.acos(
+    Math.max(-1, Math.min(1, dot / length))
+  ) * 180 / Math.PI;
+}
+
+function isVisible(p) {
+  return p && (p.visibility ?? 1) >= 0.4;
+}
+
+const connections = [
+  [11,12], [11,13], [13,15],
+  [12,14], [14,16],
+  [11,23], [12,24], [23,24],
+  [23,25], [25,27],
+  [24,26], [26,28]
+];
+
+function getArmState(lm, side, pose) {
+  const shoulder = side === "left" ? 11 : 12;
+  const elbow = side === "left" ? 13 : 14;
+  const hip = side === "left" ? 23 : 24;
+
+  if (![shoulder, elbow, hip].every(i => isVisible(lm[i]))) {
+    return null;
+  }
+
+  const measured = angle(
+    lm[elbow], lm[shoulder], lm[hip]
+  );
+
+  const target = pose === "up" ? 170 :
+                 pose === "side" ? 90 : 15;
+
+  return Math.abs(measured - target) <= 28;
+}
+
+function drawSkeleton(lm) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!lm) return;
+
+  const pose = training
+    ? exercises[exerciseIndex]?.pose
+    : "side";
+
+  const leftCorrect = getArmState(lm, "left", pose);
+  const rightCorrect = getArmState(lm, "right", pose);
+
+  for (const [a, b] of connections) {
+    const p1 = lm[a];
+    const p2 = lm[b];
+    if (!p1 || !p2) continue;
+
+    let color = "#3ee58a";
+
+    if (!isVisible(p1) || !isVisible(p2)) {
+      color = "#b4b9c3";
+    } else if ([11,13,15].includes(a) && [11,13,15].includes(b)) {
+      color = leftCorrect === null ? "#b4b9c3" :
+              leftCorrect ? "#3ee58a" : "#ff4c5b";
+    } else if ([12,14,16].includes(a) && [12,14,16].includes(b)) {
+      color = rightCorrect === null ? "#b4b9c3" :
+              rightCorrect ? "#3ee58a" : "#ff4c5b";
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
+    ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.stroke();
+  }
+
+  for (const i of [11,12,13,14,15,16,23,24,25,26,27,28]) {
+    const p = lm[i];
+    if (!isVisible(p)) continue;
+
+    ctx.beginPath();
+    ctx.arc(p.x * canvas.width, p.y * canvas.height, 5, 0, Math.PI * 2);
+    ctx.fillStyle = "white";
+    ctx.fill();
+  }
+}
+
+function checkTarget(lm) {
+  if (!training || !targetPosition || targetHit) return;
+
+  const wrists = [lm[15], lm[16]].filter(isVisible);
+  if (!wrists.length) return;
+
+  // Target position is displayed on mirrored video.
+  const hit = wrists.some(wrist => {
+    const displayedX = 1 - wrist.x;
+    const distance = Math.hypot(
+      displayedX - targetPosition.x,
+      wrist.y - targetPosition.y
+    );
+    return distance < 0.09;
+  });
+
+  if (hit) {
+    targetHit = true;
+    $("target").classList.add("hit");
+    speak("Молодец!");
+
+    setTimeout(() => {
+      if (targetHit) setTargetVisible(false);
+    }, 350);
+  }
+}
+
+function loop() {
+  if (!cameraRunning) return;
 
   if (
-    landmarker &&
+    model &&
     video.readyState >= 2 &&
-    !processing &&
-    video.currentTime !== lastVideoTime
+    video.currentTime !== lastTime
   ) {
-    processing = true;
+    lastTime = video.currentTime;
 
     try {
-      lastVideoTime = video.currentTime;
-
-      const result = landmarker.detectForVideo(
+      const result = model.detectForVideo(
         video,
         performance.now()
       );
 
-      latestLandmarks =
-        result.landmarks?.[0] || null;
+      landmarks = result.landmarks?.[0] || null;
+      drawSkeleton(landmarks);
 
-      if (latestLandmarks) {
-        setModelStatus(
-          "✅ Скелет найден: " +
-          latestLandmarks.length +
-          " точек."
-        );
-
-        const result = comparePose(
-          $("poseSelect").value
-        );
-
-        $("accuracy").textContent = result
-          ? "Точность: " + result.accuracy + "%"
-          : "Точность: —";
+      if (landmarks) {
+        checkTarget(landmarks);
+        $("modelStatus").textContent =
+          "✅ Скелет найден.";
       } else {
-        setModelStatus(
-          "Модель работает. Встань так, чтобы тело было видно."
-        );
-        $("accuracy").textContent = "Точность: —";
+        $("modelStatus").textContent =
+          "Встань так, чтобы тело было видно.";
       }
 
-      drawSkeleton(latestLandmarks);
-
     } catch (error) {
-      console.error(error);
-      setModelStatus(
-        "⚠️ Ошибка распознавания: " + error.message
-      );
-    } finally {
-      processing = false;
+      $("modelStatus").textContent =
+        "Ошибка распознавания: " + error.message;
     }
   }
 
-  animationId = requestAnimationFrame(renderLoop);
+  requestAnimationFrame(loop);
 }
 
 function stopCamera() {
-  sessionId++;
-  cameraActive = false;
-
-  if (animationId !== null) {
-    cancelAnimationFrame(animationId);
-    animationId = null;
-  }
+  session++;
+  cameraRunning = false;
+  finishTraining(false);
 
   if (stream) {
-    stream.getTracks().forEach(track => track.stop());
+    stream.getTracks().forEach(t => t.stop());
     stream = null;
   }
 
   video.pause();
   video.srcObject = null;
-  latestLandmarks = null;
-  lastVideoTime = -1;
+  landmarks = null;
+  lastTime = -1;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  setCameraStatus("Камера выключена.");
-  setModelStatus(
-    landmarker
-      ? "Модель загружена и готова к следующему запуску."
-      : "Распознавание не запущено."
-  );
+  $("cameraStatus").textContent = "Камера выключена.";
 }
 
-$("startBtn").addEventListener("click", startCamera);
-$("stopBtn").addEventListener("click", stopCamera);
+$("cameraBtn").onclick = startCamera;
+$("stopCameraBtn").onclick = stopCamera;
 
-$("tolerance").addEventListener("input", () => {
-  $("toleranceValue").textContent =
-    $("tolerance").value + "°";
-});
-
-$("savePose").addEventListener("click", () => {
-  const name = $("poseName").value.trim();
-  const measured = armAngles(latestLandmarks);
-
-  if (!name) {
-    alert("Введи название упражнения.");
-    return;
-  }
-
-  if (
-    !measured ||
-    measured.left === null ||
-    measured.right === null
-  ) {
-    alert(
-      "Сначала включи распознавание и встань так, " +
-      "чтобы плечи, локти и бёдра были видны."
-    );
-    return;
-  }
-
-  const id = "custom_" + Date.now();
-
-  customPoses[id] = {
-    name,
-    left: measured.left,
-    right: measured.right
-  };
-
-  localStorage.setItem(
-    "gymmemory_poses",
-    JSON.stringify(customPoses)
-  );
-
-  refreshPoses();
-  $("poseSelect").value = id;
-  $("poseName").value = "";
-
-  alert("Упражнение сохранено!");
-});
-
-$("deletePose").addEventListener("click", () => {
-  const id = $("poseSelect").value;
-
-  if (!customPoses[id]) {
-    alert("Встроенные упражнения удалять нельзя.");
-    return;
-  }
-
-  delete customPoses[id];
-
-  localStorage.setItem(
-    "gymmemory_poses",
-    JSON.stringify(customPoses)
-  );
-
-  refreshPoses();
-});
-
-let memorySequence = [];
-let memoryIndex = 0;
-let memoryState = "idle";
-let memoryTimer = null;
-
-function memoryMessage(text) {
-  $("memoryDisplay").textContent = text;
-}
-
-function clearMemoryTimer() {
-  if (memoryTimer) {
-    clearInterval(memoryTimer);
-    memoryTimer = null;
-  }
-}
-
-$("memoryStart").addEventListener("click", () => {
-  if (!landmarker || !cameraActive) {
-    alert(
-      "Сначала включи камеру и дождись загрузки скелета."
-    );
-    return;
-  }
-
-  const ids = Object.keys(allPoses());
-
-  if (ids.length < 2) {
-    alert("Нужно минимум два упражнения.");
-    return;
-  }
-
-  clearMemoryTimer();
-
-  memorySequence = Array.from(
-    { length: 3 },
-    () => ids[Math.floor(Math.random() * ids.length)]
-  );
-
-  memoryIndex = 0;
-  memoryState = "showing";
-
-  let seconds = 7;
-
-  function showSequence() {
-    const names = memorySequence.map(
-      id => allPoses()[id].name
-    );
-
-    memoryMessage(
-      "Запомни порядок: " +
-      names.join(" → ") +
-      ". Осталось " + seconds + " сек."
-    );
-  }
-
-  showSequence();
-
-  memoryTimer = setInterval(() => {
-    seconds--;
-
-    if (seconds <= 0) {
-      clearMemoryTimer();
-      memoryState = "repeating";
-
-      memoryMessage(
-        "Теперь повтори первую позу по памяти " +
-        "и нажми «Проверить текущую позу». " +
-        "Название правильной позы скрыто."
-      );
-    } else {
-      showSequence();
-    }
-  }, 1000);
-});
-
-$("memoryCheck").addEventListener("click", () => {
-  if (memoryState !== "repeating") {
-    alert("Сначала начни тренировку памяти.");
-    return;
-  }
-
-  const targetId = memorySequence[memoryIndex];
-  const result = comparePose(targetId);
-
-  if (!result) {
-    memoryMessage(
-      "Не вижу положение обеих рук. " +
-      "Встань полностью в кадр и попробуй снова."
-    );
-    return;
-  }
-
-  if (!result.passed) {
-    memoryMessage(
-      "Поза пока не совпала с образцом. " +
-      "Попробуй ещё раз. Точность: " +
-      result.accuracy + "%."
-    );
-    return;
-  }
-
-  memoryIndex++;
-
-  if (memoryIndex >= memorySequence.length) {
-    memoryState = "finished";
-    memoryMessage(
-      "🎉 Отлично! Все три упражнения выполнены " +
-      "в правильной последовательности."
-    );
-  } else {
-    memoryMessage(
-      "✅ Верно! Теперь повтори позу № " +
-      (memoryIndex + 1) +
-      " по памяти."
-    );
-  }
-});
-
-$("memoryStop").addEventListener("click", () => {
-  clearMemoryTimer();
-  memoryState = "idle";
-  memorySequence = [];
-  memoryIndex = 0;
-  memoryMessage("Тренировка завершена.");
-});
-
-window.addEventListener("pagehide", () => {
-  stopCamera();
-});
+setGender("girl");
+animateTrainer("down");
+updateProgress();
 </script>
 </body>
 </html>
-
