@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GymMemory</title>
+</head>
+<body style="font-family:Arial;text-align:center;padding:40px">
+<h1>GymMemory</h1>
+<p>Проверка камеры</p>
+<button onclick="startCamera()">Включить камеру</button>
+<br><br>
+<video id="camera" autoplay playsinline muted
+ style="width:100%;max-width:450px"></video>
+<p id="status"></p>
+<script>
+async function startCamera(){
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:"user"},
+      audio:false
+    });
+    document.getElementById("camera").srcObject = stream;
+    document.getElementById("status").textContent =
+      "Камера работает!";
+  } catch(e){
+    document.getElementById("status").textContent =
+      "Ошибка: " + e.message;
+  }
+}
+</script>
+</body>
+</html>
