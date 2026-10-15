@@ -1,383 +1,432 @@
 
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GymMemory 2.0</title>
+<title>GymMemory 2.1</title>
 <style>
 *{box-sizing:border-box}
-body{
- font-family:Arial,sans-serif;
- background:#f3f6fb;color:#19243a;
- margin:0;padding:16px
-}
+body{margin:0;padding:15px;background:#f2f5fa;
+font-family:Arial;color:#18243a}
 h1{text-align:center}
-.panel{
- background:white;padding:16px;
- border-radius:16px;margin:14px 0
-}
-button,select{
- padding:12px;margin:5px 0;
- border:1px solid #ccd5e2;
- border-radius:10px;font-size:15px
-}
-button{background:#e7efff}
+.panel{background:white;border-radius:16px;
+padding:15px;margin:12px 0}
+button,select{padding:12px;border-radius:10px;
+border:1px solid #ccd5e0;margin:4px;
+font-size:15px;background:#e8efff}
 button:disabled{opacity:.5}
 .primary{background:#2563eb;color:white}
-.stage{
- position:relative;width:100%;
- aspect-ratio:3/4;background:#172034;
- border-radius:14px;overflow:hidden
-}
-video,canvas{
- position:absolute;inset:0;
- width:100%;height:100%;
- object-fit:contain;
- transform:scaleX(-1)
-}
-canvas{pointer-events:none}
-#score{font-weight:bold;font-size:20px}
-#status{margin:12px 0}
-input[type=range]{width:100%}
+.stage{position:relative;background:#101827;
+border-radius:12px;overflow:hidden}
+video{display:block;width:100%;height:auto}
+canvas{position:absolute;inset:0;
+width:100%;height:100%;pointer-events:none}
+#status{overflow-wrap:anywhere;white-space:pre-wrap}
+#score{font-size:20px;font-weight:bold}
+input{width:100%}
+small{color:#64748b}
 </style>
 </head>
 <body>
 
-<h1>🤸 GymMemory 2.0</h1>
-<p>Тренировка движений и памяти</p>
-
+<h1>🤸 GymMemory 2.1</h1>
 <div class="panel">
-<button class="primary" id="start">
-📷 Включить камеру
+<button id="start" class="primary">
+📷 Включить камеру и скелет
 </button>
 <button id="stop">Выключить</button>
-<p id="status">Камера выключена</p>
+<p id="status">Ожидание запуска</p>
 <div class="stage">
 <video id="video" autoplay playsinline muted></video>
 <canvas id="overlay"></canvas>
 </div>
-<p>Встань так, чтобы всё тело было видно.</p>
+<p><small>Камера не зеркалит изображение.
+Для полного скелета встань дальше от телефона.</small></p>
 </div>
 
 <div class="panel">
-<h3>Упражнения</h3>
+<h3>Упражнение</h3>
 <select id="pose">
 <option value="up">Руки вверх</option>
 <option value="side">Руки в стороны</option>
 <option value="down">Руки вниз</option>
 </select>
 <p>
-<button id="save">➕ Запомнить мою позу</button>
+<button id="save">Сохранить позу тренера</button>
 <button id="delete">Удалить позу</button>
 </p>
 <p>Допустимое отклонение:
 <span id="tolLabel">25</span>°</p>
-<input id="tolerance" type="range"
+<input type="range" id="tolerance"
 min="10" max="55" value="25">
-<p id="score">Ожидание распознавания</p>
-<p>🟢 Правильно · 🔴 Отклонение ·
-⚪ Не видно</p>
+<p id="score">Ожидание</p>
+<p>🟢 Совпадение · 🔴 Ошибка · ⚪ Не видно</p>
 </div>
 
 <div class="panel">
-<h3>🧠 Повтори по памяти</h3>
-<p>Запомни последовательность движений.</p>
-<button id="sequence">
-Показать последовательность
-</button>
-<button id="next" disabled>
-Проверить следующий шаг
-</button>
+<h3>🧠 Режим памяти</h3>
+<button id="sequence">Показать последовательность</button>
+<button id="next" disabled>Проверить движение</button>
 <p id="memory">Начни тренировку</p>
 </div>
 
 <script type="module">
-import {
- PoseLandmarker,FilesetResolver
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm";
-
 const $=id=>document.getElementById(id);
 const video=$("video");
 const canvas=$("overlay");
 const ctx=canvas.getContext("2d");
 
-let model,stream,active=false;
-let points=null,custom={},seq=[],step=0;
-let lastTime=-1;
+let model=null,stream=null,active=false;
+let points=null,lastTime=-1,frames=0;
+let custom={},seq=[],step=0,timer=null;
 
 const edges=[
- [11,12],[11,13],[13,15],
- [12,14],[14,16],[11,23],
- [12,24],[23,24],[23,25],
- [25,27],[24,26],[26,28]
+[11,12],[11,13],[13,15],
+[12,14],[14,16],[11,23],
+[12,24],[23,24],[23,25],
+[25,27],[24,26],[26,28]
 ];
 
-function angle(a,b,c){
- if(!a||!b||!c)return null;
- const x=a.x-b.x,y=a.y-b.y;
- const u=c.x-b.x,v=c.y-b.y;
- const d=Math.hypot(x,y)*Math.hypot(u,v);
- if(!d)return null;
- return Math.acos(
-  Math.max(-1,Math.min(1,(x*u+y*v)/d))
- )*180/Math.PI;
-}
-
-function measures(p){
- return {
-  ls:angle(p[13],p[11],p[23]),
-  rs:angle(p[14],p[12],p[24]),
-  le:angle(p[11],p[13],p[15]),
-  re:angle(p[12],p[14],p[16]),
-  lk:angle(p[23],p[25],p[27]),
-  rk:angle(p[24],p[26],p[28])
- };
-}
-
 const templates={
- up:{ls:175,rs:175,le:175,re:175,lk:175,rk:175},
- side:{ls:90,rs:90,le:175,re:175,lk:175,rk:175},
- down:{ls:10,rs:10,le:175,re:175,lk:175,rk:175}
-};
-
-try{
- custom=JSON.parse(
-  localStorage.getItem("gymmemory-poses")||"{}"
- );
-}catch(e){custom={}}
-
-function updateOptions(){
- for(const o of [...$("pose").options]){
-  if(o.value.startsWith("custom-"))o.remove();
- }
- for(const key of Object.keys(custom)){
-  const o=document.createElement("option");
-  o.value=key;
-  o.textContent="Моя поза "+key.slice(7);
-  $("pose").append(o);
- }
-}
-updateOptions();
-
-function template(){
- return custom[$("pose").value]||
- templates[$("pose").value];
-}
-
-function compare(m,t){
- const tol=+$("tolerance").value;
- const keys=Object.keys(t).filter(
-  k=>Number.isFinite(m[k])
- );
- if(!keys.length)return null;
- const correct=keys.filter(
-  k=>Math.abs(m[k]-t[k])<=tol
- );
- return Math.round(100*correct.length/keys.length);
-}
-
-function draw(p){
- const w=video.videoWidth,h=video.videoHeight;
- if(!w||!h)return;
- canvas.width=w;canvas.height=h;
- ctx.clearRect(0,0,w,h);
- if(!p)return;
-
- const m=measures(p),t=template();
- const tol=+$("tolerance").value;
-
- const group={
-  11:"ls",12:"rs",13:"le",14:"re",
-  15:"le",16:"re",23:"ls",24:"rs",
-  25:"lk",26:"rk",27:"lk",28:"rk"
- };
-
- for(const [a,b] of edges){
-  const x=p[a],y=p[b];
-  if(!x||!y)continue;
-  const k=group[b]||group[a];
-  const visible=(x.visibility??1)>.45&&
-                (y.visibility??1)>.45;
-  let color="#94a3b8";
-  if(visible&&Number.isFinite(m[k])){
-   color=Math.abs(m[k]-t[k])<=tol
-    ?"#22c55e":"#ef4444";
-  }
-  ctx.strokeStyle=color;
-  ctx.lineWidth=Math.max(4,w/110);
-  ctx.lineCap="round";
-  ctx.beginPath();
-  ctx.moveTo(x.x*w,x.y*h);
-  ctx.lineTo(y.x*w,y.y*h);
-  ctx.stroke();
- }
-
- for(const i of [11,12,13,14,15,16,
-                  23,24,25,26,27,28]){
-  const a=p[i];
-  if(!a)continue;
-  ctx.fillStyle="#fef08a";
-  ctx.beginPath();
-  ctx.arc(a.x*w,a.y*h,5,0,Math.PI*2);
-  ctx.fill();
- }
-
- const s=compare(m,t);
- $("score").textContent=s===null
-  ?"Не удалось оценить позу"
-  :"Совпадение: "+s+"%";
-}
-
-async function startCamera(){
- $("status").textContent="Загрузка модели...";
- const files=await FilesetResolver.forVisionTasks(
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm"
- );
- model=await PoseLandmarker.createFromOptions(files,{
-  baseOptions:{
-   modelAssetPath:
-    "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
-   delegate:"CPU"
-  },
-  runningMode:"VIDEO",
-  numPoses:1
- });
-
- stream=await navigator.mediaDevices.getUserMedia({
-  video:{facingMode:"user"},
-  audio:false
- });
- video.srcObject=stream;
- await video.play();
- active=true;
- lastTime=-1;
- $("status").textContent="Распознавание работает";
- requestAnimationFrame(loop);
-}
-
-function loop(){
- if(!active)return;
- if(video.readyState>=2&&
-    video.currentTime!==lastTime){
-  lastTime=video.currentTime;
-  try{
-   const result=model.detectForVideo(
-    video,performance.now()
-   );
-   points=result.landmarks?.[0]||null;
-   draw(points);
-   if(!points){
-    $("score").textContent="Тело не найдено";
-   }
-  }catch(e){
-   $("status").textContent="Ошибка: "+e.message;
-  }
- }
- requestAnimationFrame(loop);
-}
-
-$("start").onclick=async()=>{
- if(active)return;
- $("start").disabled=true;
- try{
-  await startCamera();
- }catch(e){
-  $("status").textContent="Ошибка: "+e.message;
- }finally{
-  $("start").disabled=false;
- }
-};
-
-$("stop").onclick=()=>{
- active=false;
- stream?.getTracks().forEach(t=>t.stop());
- video.srcObject=null;
- ctx.clearRect(0,0,canvas.width,canvas.height);
- $("status").textContent="Камера выключена";
-};
-
-$("save").onclick=()=>{
- if(!points){
-  alert("Сначала включи камеру");
-  return;
- }
- const m=measures(points);
- if(Object.values(m).some(
-  v=>!Number.isFinite(v)
- )){
-  alert("Не все суставы видны");
-  return;
- }
- const ids=Object.keys(custom).map(
-  k=>Number(k.slice(7))
- ).filter(Number.isFinite);
- const key="custom-"+(Math.max(0,...ids)+1);
- custom[key]=m;
- localStorage.setItem(
-  "gymmemory-poses",JSON.stringify(custom)
- );
- updateOptions();
- $("pose").value=key;
- alert("Поза сохранена!");
-};
-
-$("delete").onclick=()=>{
- const key=$("pose").value;
- if(!key.startsWith("custom-"))return;
- delete custom[key];
- localStorage.setItem(
-  "gymmemory-poses",JSON.stringify(custom)
- );
- updateOptions();
- $("pose").value="up";
-};
-
-$("tolerance").oninput=()=>{
- $("tolLabel").textContent=$("tolerance").value;
+up:{ls:175,rs:175,le:175,re:175,lk:175,rk:175},
+side:{ls:90,rs:90,le:175,re:175,lk:175,rk:175},
+down:{ls:10,rs:10,le:175,re:175,lk:175,rk:175}
 };
 
 const names={
- up:"Руки вверх",
- side:"Руки в стороны",
- down:"Руки вниз"
+up:"Руки вверх",
+side:"Руки в стороны",
+down:"Руки вниз"
+};
+
+try{
+custom=JSON.parse(
+localStorage.getItem("gymmemory-poses")||"{}"
+);
+}catch(e){custom={}}
+
+function updateOptions(){
+for(const o of [...$("pose").options]){
+if(o.value.startsWith("custom-"))o.remove();
+}
+for(const key of Object.keys(custom)){
+const o=document.createElement("option");
+o.value=key;
+o.textContent="Поза тренера "+key.slice(7);
+$("pose").append(o);
+}
+}
+updateOptions();
+
+function angle(a,b,c){
+if(!a||!b||!c)return null;
+const x=a.x-b.x,y=a.y-b.y;
+const u=c.x-b.x,v=c.y-b.y;
+const d=Math.hypot(x,y)*Math.hypot(u,v);
+if(!d)return null;
+return Math.acos(
+Math.max(-1,Math.min(1,(x*u+y*v)/d))
+)*180/Math.PI;
+}
+
+function measures(p){
+return {
+ls:angle(p[13],p[11],p[23]),
+rs:angle(p[14],p[12],p[24]),
+le:angle(p[11],p[13],p[15]),
+re:angle(p[12],p[14],p[16]),
+lk:angle(p[23],p[25],p[27]),
+rk:angle(p[24],p[26],p[28])
+};
+}
+
+function template(){
+return custom[$("pose").value]||
+templates[$("pose").value]||templates.up;
+}
+
+function compare(m,t){
+const keys=Object.keys(t).filter(
+k=>Number.isFinite(m[k])
+);
+if(!keys.length)return null;
+const tol=+$("tolerance").value;
+return Math.round(
+100*keys.filter(k=>
+Math.abs(m[k]-t[k])<=tol
+).length/keys.length
+);
+}
+
+function draw(p){
+const w=video.videoWidth;
+const h=video.videoHeight;
+if(!w||!h)return;
+
+if(canvas.width!==w||canvas.height!==h){
+canvas.width=w;
+canvas.height=h;
+}
+ctx.clearRect(0,0,w,h);
+
+if(!p){
+$("score").textContent="Человек не обнаружен";
+return;
+}
+
+const m=measures(p),t=template();
+const tol=+$("tolerance").value;
+const groups=[
+null,"ls","le","rs","re",
+null,null,null,"lk","lk","rk","rk"
+];
+
+for(let j=0;j<edges.length;j++){
+const [a,b]=edges[j];
+const x=p[a],y=p[b];
+if(!x||!y)continue;
+
+const visible=
+(x.visibility??1)>.4&&
+(y.visibility??1)>.4;
+
+const k=groups[j];
+let color="#94a3b8";
+
+if(visible){
+if(!k){
+color="#22c55e";
+}else if(Number.isFinite(m[k])){
+color=Math.abs(m[k]-t[k])<=tol
+?"#22c55e":"#ef4444";
+}
+}
+
+ctx.strokeStyle=color;
+ctx.lineWidth=Math.max(4,w/110);
+ctx.lineCap="round";
+ctx.beginPath();
+ctx.moveTo(x.x*w,x.y*h);
+ctx.lineTo(y.x*w,y.y*h);
+ctx.stroke();
+}
+
+for(const i of [11,12,13,14,15,16,
+23,24,25,26,27,28]){
+const a=p[i];
+if(!a||(a.visibility??1)<.4)continue;
+ctx.fillStyle="#fef08a";
+ctx.beginPath();
+ctx.arc(a.x*w,a.y*h,5,0,Math.PI*2);
+ctx.fill();
+}
+
+const s=compare(m,t);
+$("score").textContent=s===null
+?"Нет данных для оценки"
+:"Совпадение: "+s+"%";
+}
+
+async function startCamera(){
+if(active)return;
+$("start").disabled=true;
+
+try{
+$("status").textContent=
+"Шаг 1/3: загрузка библиотеки...";
+
+const {PoseLandmarker,FilesetResolver}=
+await import(
+"https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm"
+);
+
+$("status").textContent=
+"Шаг 2/3: загрузка модели тела...";
+
+const files=await FilesetResolver.forVisionTasks(
+"https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm"
+);
+
+model=await PoseLandmarker.createFromOptions(files,{
+baseOptions:{
+modelAssetPath:
+"https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+delegate:"CPU"
+},
+runningMode:"VIDEO",
+numPoses:1
+});
+
+$("status").textContent=
+"Шаг 3/3: включение камеры...";
+
+stream=await navigator.mediaDevices.getUserMedia({
+video:{
+facingMode:"user",
+width:{ideal:640},
+height:{ideal:480}
+},
+audio:false
+});
+
+video.srcObject=stream;
+await video.play();
+
+active=true;
+lastTime=-1;
+frames=0;
+$("status").textContent=
+"Модель загружена. Ищу человека...";
+requestAnimationFrame(loop);
+
+}catch(e){
+$("status").textContent=
+"Ошибка запуска: "+(e.message||String(e));
+stream?.getTracks().forEach(t=>t.stop());
+stream=null;
+}finally{
+$("start").disabled=false;
+}
+}
+
+function loop(){
+if(!active)return;
+
+if(video.readyState>=2&&
+video.currentTime!==lastTime){
+lastTime=video.currentTime;
+
+try{
+const result=model.detectForVideo(
+video,performance.now()
+);
+points=result.landmarks?.[0]||null;
+draw(points);
+
+frames++;
+if(frames%30===0){
+$("status").textContent=points
+?"Скелет найден: "+points.length+" точек"
+:"Модель работает, но тело не найдено. Отойди от камеры.";
+}
+}catch(e){
+$("status").textContent=
+"Ошибка распознавания: "+(e.message||e);
+active=false;
+return;
+}
+}
+requestAnimationFrame(loop);
+}
+
+$("start").onclick=startCamera;
+
+$("stop").onclick=()=>{
+active=false;
+stream?.getTracks().forEach(t=>t.stop());
+stream=null;
+video.srcObject=null;
+points=null;
+ctx.clearRect(0,0,canvas.width,canvas.height);
+$("status").textContent="Камера выключена";
+};
+
+$("save").onclick=()=>{
+if(!points){
+alert("Сначала включи камеру");
+return;
+}
+
+const m=measures(points);
+if(Object.values(m).some(
+v=>!Number.isFinite(v)
+)){
+alert("Не удалось измерить все суставы");
+return;
+}
+
+const ids=Object.keys(custom).map(
+k=>Number(k.slice(7))
+).filter(Number.isFinite);
+
+const key="custom-"+(Math.max(0,...ids)+1);
+custom[key]=m;
+
+localStorage.setItem(
+"gymmemory-poses",JSON.stringify(custom)
+);
+
+updateOptions();
+$("pose").value=key;
+alert("Поза сохранена!");
+};
+
+$("delete").onclick=()=>{
+const key=$("pose").value;
+if(!key.startsWith("custom-"))return;
+
+delete custom[key];
+localStorage.setItem(
+"gymmemory-poses",JSON.stringify(custom)
+);
+updateOptions();
+$("pose").value="up";
+};
+
+$("tolerance").oninput=()=>{
+$("tolLabel").textContent=
+$("tolerance").value;
 };
 
 $("sequence").onclick=()=>{
- seq=["up","side","down"];
- seq.sort(()=>Math.random()-.5);
- step=0;
- $("memory").textContent=
-  "Запомни: "+seq.map(x=>names[x]).join(" → ");
- $("next").disabled=true;
- setTimeout(()=>{
-  $("memory").textContent=
-   "Повтори первое движение по памяти";
-  $("pose").value=seq[0];
-  $("next").disabled=false;
- },7000);
+if(timer)clearTimeout(timer);
+
+seq=["up","side","down"];
+
+for(let i=seq.length-1;i>0;i--){
+const j=Math.floor(Math.random()*(i+1));
+[seq[i],seq[j]]=[seq[j],seq[i]];
+}
+
+step=0;
+$("memory").textContent=
+"Запомни: "+seq.map(x=>names[x]).join(" → ");
+$("next").disabled=true;
+
+timer=setTimeout(()=>{
+$("memory").textContent=
+"Теперь повтори движения по памяти. Шаг 1 из 3";
+$("pose").value=seq[0];
+$("next").disabled=false;
+},7000);
 };
 
 $("next").onclick=()=>{
- if(!points||!seq.length)return;
- const s=compare(
-  measures(points),templates[seq[step]]
- );
- if(s===null||s<70){
-  $("memory").textContent=
-   "Попробуй ещё раз: "+(s??0)+"%";
-  return;
- }
- step++;
- if(step>=seq.length){
-  $("memory").textContent=
-   "🎉 Последовательность завершена!";
-  $("next").disabled=true;
-  return;
- }
- $("pose").value=seq[step];
- $("memory").textContent=
-  "Верно! Следующее движение: "+(step+1);
+if(!points||!seq.length)return;
+
+const s=compare(
+measures(points),templates[seq[step]]
+);
+
+if(s===null||s<70){
+$("memory").textContent=
+"Попробуй ещё раз: "+(s??0)+"%";
+return;
+}
+
+step++;
+
+if(step>=seq.length){
+$("memory").textContent=
+"🎉 Все три положения выполнены!";
+$("next").disabled=true;
+return;
+}
+
+$("pose").value=seq[step];
+$("memory").textContent=
+"Следующее положение: "+(step+1)+" из 3";
 };
 </script>
 </body>
